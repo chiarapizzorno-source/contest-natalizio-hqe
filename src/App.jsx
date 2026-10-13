@@ -7,8 +7,8 @@ const supabase = createClient(
 );
 
 export default function App() {
-  const [session, setSession] = useState(null);
-  const [email, setEmail] = useState('');
+  const [currentUser, setCurrentUser] = useState(null);
+  const [emailInput, setEmailInput] = useState('');
   const [isAdmin, setIsAdmin] = useState(false);
   
   const [settings, setSettings] = useState(null);
@@ -25,36 +25,22 @@ export default function App() {
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      if (session) checkUserRole(session.user.email);
-    });
-
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setSession(session);
-      if (session) checkUserRole(session.user.email);
-    });
-
+    const savedUser = localStorage.getItem('hqe_contest_user');
+    if (savedUser) {
+      const userData = JSON.parse(savedUser);
+      setCurrentUser(userData);
+      setIsAdmin(userData.is_admin);
+    }
     fetchSettings();
-    return () => subscription.unsubscribe();
   }, []);
 
   useEffect(() => {
-    if (session) {
+    if (currentUser) {
       fetchPhotos();
       fetchUserVotes();
-      if (isAdmin) fetchWhitelist();
+      if (currentUser.is_admin) fetchWhitelist();
     }
-  }, [session, isAdmin]);
-
-  const checkUserRole = async (userEmail) => {
-    const { data } = await supabase
-      .from('users_whitelist')
-      .select('is_admin')
-      .eq('email', userEmail.toLowerCase())
-      .single();
-    if (data) setIsAdmin(data.is_admin);
-  };
+  }, [currentUser]);
 
   const fetchSettings = async () => {
     const { data } = await supabase.from('contest_settings').select('*').single();
@@ -71,7 +57,8 @@ export default function App() {
   };
 
   const fetchUserVotes = async () => {
-    const { data } = await supabase.from('votes').select('photo_id').eq('voter_email', session.user.email);
+    if (!currentUser) return;
+    const { data } = await supabase.from('votes').select('photo_id').eq('voter_email', currentUser.email);
     setUserVotes((data || []).map(v => v.photo_id));
   };
 
@@ -82,24 +69,31 @@ export default function App() {
 
   const handleLogin = async (e) => {
     e.preventDefault();
+    const cleanEmail = emailInput.trim().toLowerCase();
     setLoading(true);
 
-    const { data: allowed } = await supabase
+    const { data: userRecord, error } = await supabase
       .from('users_whitelist')
-      .select('email')
-      .eq('email', email.trim().toLowerCase())
+      .select('*')
+      .eq('email', cleanEmail)
       .single();
 
-    if (!allowed) {
-      alert('Email non presente tra le utenze autorizzate.');
+    if (error || !userRecord) {
+      alert('Email non presente tra le utenze autorizzate al contest.');
       setLoading(false);
       return;
     }
 
-    const { error } = await supabase.auth.signInWithOtp({ email: email.trim().toLowerCase() });
-    if (error) alert(error.message);
-    else alert('Magic Link inviato! Controlla la tua casella di posta aziendale.');
+    localStorage.setItem('hqe_contest_user', JSON.stringify(userRecord));
+    setCurrentUser(userRecord);
+    setIsAdmin(userRecord.is_admin);
     setLoading(false);
+  };
+
+  const handleLogout = () => {
+    localStorage.removeItem('hqe_contest_user');
+    setCurrentUser(null);
+    setIsAdmin(false);
   };
 
   const handleUpload = async (e) => {
@@ -127,14 +121,14 @@ export default function App() {
     await supabase.from('team_photos').insert([{
       team_name: teamName,
       photo_url: publicUrl,
-      uploaded_by: session.user.email
+      uploaded_by: currentUser.email
     }]);
 
     setTeamName('');
     setFile(null);
     setLoading(false);
     fetchPhotos();
-    alert('Foto caricata con successo!');
+    alert('Foto del Team caricata con successo!');
   };
 
   const handleVoteToggle = async (photoId) => {
@@ -151,13 +145,13 @@ export default function App() {
     const hasVoted = userVotes.includes(photoId);
 
     if (hasVoted) {
-      await supabase.from('votes').delete().match({ voter_email: session.user.email, photo_id: photoId });
+      await supabase.from('votes').delete().match({ voter_email: currentUser.email, photo_id: photoId });
     } else {
       if (userVotes.length >= 4) {
-        alert('Puoi esprimere un massimo di 4 voti.');
+        alert('Hai già raggiunto il limite massimo di 4 voti.');
         return;
       }
-      await supabase.from('votes').insert([{ voter_email: session.user.email, photo_id: photoId }]);
+      await supabase.from('votes').insert([{ voter_email: currentUser.email, photo_id: photoId }]);
     }
     fetchUserVotes();
   };
@@ -192,29 +186,29 @@ export default function App() {
         <h1 style={{ margin: 0, color: '#38bdf8', fontSize: '24px', letterSpacing: '1px' }}>
           HQE | <span style={{ color: '#ef4444' }}>CONTEST NATALIZIO</span>
         </h1>
-        {session && (
-          <button onClick={() => supabase.auth.signOut()} style={{ background: '#475569', color: '#fff', border: 'none', padding: '8px 16px', borderRadius: '6px', cursor: 'pointer' }}>
-            Esci ({session.user.email})
+        {currentUser && (
+          <button onClick={handleLogout} style={{ background: '#475569', color: '#fff', border: 'none', padding: '8px 16px', borderRadius: '6px', cursor: 'pointer' }}>
+            Esci ({currentUser.email})
           </button>
         )}
       </header>
 
       <main style={{ maxWidth: '1000px', margin: '0 auto', padding: '30px 20px' }}>
-        {!session ? (
+        {!currentUser ? (
           <div style={{ background: '#1e293b', padding: '40px', borderRadius: '12px', textAlign: 'center', maxWidth: '450px', margin: '50px auto', border: '1px solid #334155' }}>
             <h2 style={{ marginTop: 0, color: '#38bdf8' }}>CONTEST NATALIZIO HQE</h2>
-            <p style={{ color: '#94a3b8', fontSize: '14px' }}>Inserisci la tua email aziendale per accedere all'app.</p>
+            <p style={{ color: '#94a3b8', fontSize: '14px' }}>Inserisci la tua email aziendale per accedere al contest.</p>
             <form onSubmit={handleLogin} style={{ marginTop: '20px' }}>
               <input
                 type="email"
                 placeholder="nome.cognome@hqe.it"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
+                value={emailInput}
+                onChange={(e) => setEmailInput(e.target.value)}
                 required
                 style={{ width: '100%', padding: '12px', borderRadius: '6px', border: '1px solid #475569', background: '#0f172a', color: '#fff', marginBottom: '15px', boxSizing: 'border-box' }}
               />
               <button type="submit" disabled={loading} style={{ width: '100%', padding: '12px', background: '#0284c7', color: '#fff', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold' }}>
-                Invia Magic Link di Accesso
+                Accedi al Contest
               </button>
             </form>
           </div>
@@ -258,7 +252,7 @@ export default function App() {
               <h3>Galleria Foto Team</h3>
               {isVotePhase && (
                 <p style={{ color: '#94a3b8' }}>
-                  Hai espresso <strong>{userVotes.length}</strong> voti (minimo 3, massimo 4 preferenze).
+                  Hai espresso <strong>{userVotes.length}</strong> voti (minimo 3, massimo 4 preferenze per completare la votazione).
                 </p>
               )}
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '20px', marginTop: '20px' }}>
