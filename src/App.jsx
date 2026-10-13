@@ -11,8 +11,8 @@ export default function App() {
   const [emailInput, setEmailInput] = useState('');
   const [isAdmin, setIsAdmin] = useState(false);
   
-  // Menu di Navigazione
-  const [activeTab, setActiveTab] = useState('upload'); // 'upload', 'vote', 'admin_settings', 'admin_results'
+  // Menu Navigazione ('upload', 'vote', 'admin_settings', 'admin_results')
+  const [activeTab, setActiveTab] = useState('upload');
 
   const [settings, setSettings] = useState(null);
   const [photos, setPhotos] = useState([]);
@@ -169,6 +169,28 @@ export default function App() {
     if (isAdmin) fetchAllVotes();
   };
 
+  // Eliminazione Foto Riservata agli Admin
+  const handleDeletePhoto = async (photoId, teamName) => {
+    if (!window.confirm(`Sei sicuro di voler eliminare la foto del team "${teamName}"? Questa azione è irreversibile.`)) {
+      return;
+    }
+
+    // 1. Elimina i voti associati alla foto
+    await supabase.from('votes').delete().eq('photo_id', photoId);
+    
+    // 2. Elimina la foto dalla tabella
+    const { error } = await supabase.from('team_photos').delete().eq('id', photoId);
+
+    if (error) {
+      alert('Errore durante l’eliminazione: ' + error.message);
+    } else {
+      alert(`Foto del team "${teamName}" eliminata correttamente.`);
+      fetchPhotos();
+      fetchUserVotes();
+      if (isAdmin) fetchAllVotes();
+    }
+  };
+
   const handleAddWhitelist = async () => {
     if (!newEmail) return;
     await supabase.from('users_whitelist').insert([{ email: newEmail.trim().toLowerCase(), is_admin: false }]);
@@ -193,7 +215,6 @@ export default function App() {
   const isUploadPhase = settings && new Date() <= new Date(settings.upload_deadline);
   const isVotePhase = settings && new Date() > new Date(settings.upload_deadline) && new Date() <= new Date(settings.vote_deadline);
 
-  // Conteggio voti per la schermata Admin
   const getPhotoVotesCount = (photoId) => {
     return allVotes.filter(v => v.photo_id === photoId).length;
   };
@@ -207,7 +228,6 @@ export default function App() {
       backgroundImage: 'radial-gradient(rgba(255, 255, 255, 0.15) 2px, transparent 0)',
       backgroundSize: '30px 30px'
     }}>
-      {/* Intestazione */}
       <header style={{ borderBottom: '1px solid #334155', padding: '20px 40px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#1e293b' }}>
         <h1 style={{ margin: 0, color: '#38bdf8', fontSize: '24px', letterSpacing: '1px' }}>
           🎄 HQE | <span style={{ color: '#ef4444' }}>CONTEST NATALIZIO</span> ☃️
@@ -219,7 +239,6 @@ export default function App() {
         )}
       </header>
 
-      {/* Sfondo Decorativo Natalizio */}
       <div style={{ textAlign: 'center', fontSize: '28px', padding: '10px 0', background: 'rgba(30, 41, 59, 0.5)', letterSpacing: '8px' }}>
         ❄️ 🎄 ☃️ 🎁 🎅 🎄 ☃️ ❄️
       </div>
@@ -246,7 +265,7 @@ export default function App() {
         ) : (
           <div style={{ display: 'grid', gridTemplateColumns: '260px 1fr', gap: '25px', marginTop: '20px' }}>
             
-            {/* MENU DI NAVIGAZIONE A SINISTRA (Stile Radio Button) */}
+            {/* MENU DI NAVIGAZIONE A SINISTRA */}
             <aside style={{ background: '#1e293b', padding: '20px', borderRadius: '10px', border: '1px solid #334155', height: 'fit-content' }}>
               <h3 style={{ margin: '0 0 15px 0', color: '#f8fafc', fontSize: '18px', display: 'flex', alignItems: 'center', gap: '8px' }}>
                 📌 Menu Navigazione
@@ -286,7 +305,6 @@ export default function App() {
             {/* CONTENUTO PRINCIPALE */}
             <section style={{ background: '#1e293b', padding: '25px', borderRadius: '10px', border: '1px solid #334155' }}>
               
-              {/* STATO SCADENZE SEMPRE VISIBILE */}
               <div style={{ background: '#0f172a', padding: '12px 18px', borderRadius: '8px', marginBottom: '20px', borderLeft: '4px solid #38bdf8' }}>
                 <p style={{ margin: '2px 0', fontSize: '13px' }}>📸 <strong>Caricamento fino a:</strong> {settings ? new Date(settings.upload_deadline).toLocaleString() : '...'}</p>
                 <p style={{ margin: '2px 0', fontSize: '13px' }}>🗳️ <strong>Votazioni fino a:</strong> {settings ? new Date(settings.vote_deadline).toLocaleString() : '...'}</p>
@@ -348,11 +366,31 @@ export default function App() {
                                 cursor: 'pointer',
                                 background: isVoted ? '#ef4444' : '#0284c7',
                                 color: '#fff',
-                                fontWeight: 'bold'
+                                fontWeight: 'bold',
+                                marginBottom: isAdmin ? '8px' : '0'
                               }}
                             >
                               {isVoted ? 'Rimuovi Voto ✕' : 'Vota Foto ★'}
                             </button>
+
+                            {/* TASTO CANCELLA PER ADMIN */}
+                            {isAdmin && (
+                              <button
+                                onClick={() => handleDeletePhoto(photo.id, photo.team_name)}
+                                style={{
+                                  width: '100%',
+                                  padding: '6px',
+                                  border: '1px solid #ef4444',
+                                  borderRadius: '6px',
+                                  cursor: 'pointer',
+                                  background: 'transparent',
+                                  color: '#ef4444',
+                                  fontSize: '12px'
+                                }}
+                              >
+                                Elimina Foto 🗑️
+                              </button>
+                            )}
                           </div>
                         </div>
                       );
@@ -397,11 +435,11 @@ export default function App() {
                 </div>
               )}
 
-              {/* SEZIONE 4 (ADMIN): RISULTATI E VOTE MONITORING */}
+              {/* SEZIONE 4 (ADMIN): RISULTATI E ELIMINAZIONE FOTO */}
               {activeTab === 'admin_results' && isAdmin && (
                 <div>
-                  <h2 style={{ marginTop: 0, color: '#f59e0b' }}>📊 Monitoraggio Risultati & Voti</h2>
-                  <p style={{ color: '#94a3b8', fontSize: '13px' }}>Questa classifica è visibile esclusivamente alle 4 utenze Admin.</p>
+                  <h2 style={{ marginTop: 0, color: '#f59e0b' }}>📊 Monitoraggio Risultati & Foto</h2>
+                  <p style={{ color: '#94a3b8', fontSize: '13px' }}>Sezione riservata esclusivamente ai 4 amministratori per la gestione delle foto e il conteggio dei voti.</p>
 
                   <table style={{ width: '100%', borderCollapse: 'collapse', marginTop: '15px' }}>
                     <thead>
@@ -409,6 +447,7 @@ export default function App() {
                         <th style={{ padding: '10px' }}>Team</th>
                         <th style={{ padding: '10px' }}>Caricata da</th>
                         <th style={{ padding: '10px' }}>Totale Voti</th>
+                        <th style={{ padding: '10px', textAlign: 'center' }}>Azione Admin</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -422,6 +461,14 @@ export default function App() {
                             </td>
                             <td style={{ padding: '10px', color: '#94a3b8', fontSize: '13px' }}>{photo.uploaded_by}</td>
                             <td style={{ padding: '10px', color: '#38bdf8', fontWeight: 'bold', fontSize: '16px' }}>{photo.votesCount}</td>
+                            <td style={{ padding: '10px', textAlign: 'center' }}>
+                              <button
+                                onClick={() => handleDeletePhoto(photo.id, photo.team_name)}
+                                style={{ background: '#ef4444', color: '#fff', border: 'none', padding: '6px 12px', borderRadius: '4px', cursor: 'pointer', fontSize: '12px', fontWeight: 'bold' }}
+                              >
+                                Elimina 🗑️
+                              </button>
+                            </td>
                           </tr>
                         ))}
                     </tbody>
