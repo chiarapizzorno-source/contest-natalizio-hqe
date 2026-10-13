@@ -6,12 +6,16 @@ const supabase = createClient(
   import.meta.env.VITE_SUPABASE_ANON_KEY
 );
 
+const ADMIN_PASSWORD = 'Giovannilucadavighignolo';
+
 export default function App() {
   const [currentUser, setCurrentUser] = useState(null);
   const [emailInput, setEmailInput] = useState('');
   const [isAdmin, setIsAdmin] = useState(false);
   
   const [activeTab, setActiveTab] = useState('upload');
+  const [isAdminUnlocked, setIsAdminUnlocked] = useState(false);
+  const [adminPasswordInput, setAdminPasswordInput] = useState('');
 
   const [settings, setSettings] = useState(null);
   const [photos, setPhotos] = useState([]);
@@ -105,6 +109,17 @@ export default function App() {
     localStorage.removeItem('hqe_contest_user');
     setCurrentUser(null);
     setIsAdmin(false);
+    setIsAdminUnlocked(false);
+  };
+
+  const handleAdminUnlock = (e) => {
+    e.preventDefault();
+    if (adminPasswordInput === ADMIN_PASSWORD) {
+      setIsAdminUnlocked(true);
+      setAdminPasswordInput('');
+    } else {
+      alert('Password Admin errata!');
+    }
   };
 
   const handleUpload = async (e) => {
@@ -229,7 +244,6 @@ export default function App() {
       backgroundImage: 'radial-gradient(rgba(255, 255, 255, 0.12) 2px, transparent 0)',
       backgroundSize: '30px 30px'
     }}>
-      {/* INTESTAZIONE AGGIORNATA CON "GRUPPO HQ" */}
       <header style={{ borderBottom: '1px solid #334155', padding: '20px 40px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#1e293b' }}>
         <h1 style={{ margin: 0, color: '#38bdf8', fontSize: '24px', letterSpacing: '1px' }}>
           🎄 GRUPPO HQ | <span style={{ color: '#ef4444' }}>CONTEST NATALIZIO</span> ☃️
@@ -381,8 +395,29 @@ export default function App() {
                 </div>
               )}
 
+              {/* CONTROLLO PASSWORD ADMIN */}
+              {(activeTab === 'admin_settings' || activeTab === 'admin_results') && isAdmin && !isAdminUnlocked && (
+                <div style={{ background: '#0f172a', padding: '30px', borderRadius: '10px', textAlign: 'center', maxWidth: '400px', margin: '20px auto', border: '1px solid #334155' }}>
+                  <h3 style={{ marginTop: 0, color: '#f59e0b' }}>🔒 Area Riservata Admin</h3>
+                  <p style={{ color: '#94a3b8', fontSize: '13px' }}>Inserisci la password di amministrazione per sbloccare l'area.</p>
+                  <form onSubmit={handleAdminUnlock} style={{ marginTop: '15px' }}>
+                    <input
+                      type="password"
+                      placeholder="Password Admin"
+                      value={adminPasswordInput}
+                      onChange={(e) => setAdminPasswordInput(e.target.value)}
+                      required
+                      style={{ width: '100%', padding: '10px', borderRadius: '6px', border: '1px solid #475569', background: '#1e293b', color: '#fff', marginBottom: '12px', boxSizing: 'border-box' }}
+                    />
+                    <button type="submit" style={{ width: '100%', padding: '10px', background: '#f59e0b', color: '#fff', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold' }}>
+                      Sblocca Area Admin
+                    </button>
+                  </form>
+                </div>
+              )}
+
               {/* ADMIN SETTINGS */}
-              {activeTab === 'admin_settings' && isAdmin && (
+              {activeTab === 'admin_settings' && isAdmin && isAdminUnlocked && (
                 <div>
                   <h2 style={{ marginTop: 0, color: '#f59e0b' }}>🛠️ Gestione Scadenze & Whitelist</h2>
                   
@@ -418,7 +453,7 @@ export default function App() {
               )}
 
               {/* ADMIN RESULTS & PODIO */}
-              {activeTab === 'admin_results' && isAdmin && (
+              {activeTab === 'admin_results' && isAdmin && isAdminUnlocked && (
                 <div>
                   <h2 style={{ marginTop: 0, color: '#f59e0b' }}>📊 Monitoraggio Risultati & Podio</h2>
                   <p style={{ color: '#94a3b8', fontSize: '13px' }}>Classifica in tempo reale visibile soltanto alle 4 utenze Admin.</p>
@@ -467,7 +502,7 @@ export default function App() {
                     </div>
                   )}
 
-                  {/* TABELLA GENERALE DETTAGLIATA */}
+                  {/* TABELLA DETTAGLIATA */}
                   <table style={{ width: '100%', borderCollapse: 'collapse', marginTop: '20px' }}>
                     <thead>
                       <tr style={{ background: '#0f172a', textAlign: 'left', borderBottom: '2px solid #334155' }}>
