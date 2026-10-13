@@ -11,7 +11,6 @@ export default function App() {
   const [emailInput, setEmailInput] = useState('');
   const [isAdmin, setIsAdmin] = useState(false);
   
-  // Menu Navigazione ('upload', 'vote', 'admin_settings', 'admin_results')
   const [activeTab, setActiveTab] = useState('upload');
 
   const [settings, setSettings] = useState(null);
@@ -169,22 +168,16 @@ export default function App() {
     if (isAdmin) fetchAllVotes();
   };
 
-  // Eliminazione Foto Riservata agli Admin
   const handleDeletePhoto = async (photoId, teamName) => {
-    if (!window.confirm(`Sei sicuro di voler eliminare la foto del team "${teamName}"? Questa azione è irreversibile.`)) {
-      return;
-    }
+    if (!window.confirm(`Sei sicuro di voler eliminare la foto del team "${teamName}"?`)) return;
 
-    // 1. Elimina i voti associati alla foto
     await supabase.from('votes').delete().eq('photo_id', photoId);
-    
-    // 2. Elimina la foto dalla tabella
     const { error } = await supabase.from('team_photos').delete().eq('id', photoId);
 
     if (error) {
-      alert('Errore durante l’eliminazione: ' + error.message);
+      alert('Errore eliminazione: ' + error.message);
     } else {
-      alert(`Foto del team "${teamName}" eliminata correttamente.`);
+      alert(`Foto del team "${teamName}" eliminata.`);
       fetchPhotos();
       fetchUserVotes();
       if (isAdmin) fetchAllVotes();
@@ -219,18 +212,27 @@ export default function App() {
     return allVotes.filter(v => v.photo_id === photoId).length;
   };
 
+  const sortedPhotos = photos
+    .map(p => ({ ...p, votesCount: getPhotoVotesCount(p.id) }))
+    .sort((a, b) => b.votesCount - a.votesCount);
+
+  const firstPlace = sortedPhotos[0];
+  const secondPlace = sortedPhotos[1];
+  const thirdPlace = sortedPhotos[2];
+
   return (
     <div style={{
       backgroundColor: '#0f172a',
       color: '#f8fafc',
       minHeight: '100vh',
       fontFamily: "'Segoe UI', Roboto, sans-serif",
-      backgroundImage: 'radial-gradient(rgba(255, 255, 255, 0.15) 2px, transparent 0)',
+      backgroundImage: 'radial-gradient(rgba(255, 255, 255, 0.12) 2px, transparent 0)',
       backgroundSize: '30px 30px'
     }}>
+      {/* INTESTAZIONE AGGIORNATA CON "GRUPPO HQ" */}
       <header style={{ borderBottom: '1px solid #334155', padding: '20px 40px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#1e293b' }}>
         <h1 style={{ margin: 0, color: '#38bdf8', fontSize: '24px', letterSpacing: '1px' }}>
-          🎄 HQE | <span style={{ color: '#ef4444' }}>CONTEST NATALIZIO</span> ☃️
+          🎄 GRUPPO HQ | <span style={{ color: '#ef4444' }}>CONTEST NATALIZIO</span> ☃️
         </h1>
         {currentUser && (
           <button onClick={handleLogout} style={{ background: '#ef4444', color: '#fff', border: 'none', padding: '8px 16px', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold' }}>
@@ -239,14 +241,14 @@ export default function App() {
         )}
       </header>
 
-      <div style={{ textAlign: 'center', fontSize: '28px', padding: '10px 0', background: 'rgba(30, 41, 59, 0.5)', letterSpacing: '8px' }}>
+      <div style={{ textAlign: 'center', fontSize: '26px', padding: '8px 0', background: 'rgba(30, 41, 59, 0.6)', letterSpacing: '8px' }}>
         ❄️ 🎄 ☃️ 🎁 🎅 🎄 ☃️ ❄️
       </div>
 
-      <main style={{ maxWidth: '1000px', margin: '0 auto', padding: '20px' }}>
+      <main style={{ maxWidth: '1050px', margin: '0 auto', padding: '20px' }}>
         {!currentUser ? (
           <div style={{ background: '#1e293b', padding: '40px', borderRadius: '12px', textAlign: 'center', maxWidth: '450px', margin: '40px auto', border: '1px solid #334155', boxShadow: '0 10px 25px rgba(0,0,0,0.5)' }}>
-            <h2 style={{ marginTop: 0, color: '#38bdf8' }}>ACCESSO CONTEST</h2>
+            <h2 style={{ marginTop: 0, color: '#38bdf8' }}>GRUPPO HQ - CONTEST NATALIZIO</h2>
             <p style={{ color: '#94a3b8', fontSize: '14px' }}>Inserisci la tua email aziendale per accedere.</p>
             <form onSubmit={handleLogin} style={{ marginTop: '20px' }}>
               <input
@@ -265,9 +267,9 @@ export default function App() {
         ) : (
           <div style={{ display: 'grid', gridTemplateColumns: '260px 1fr', gap: '25px', marginTop: '20px' }}>
             
-            {/* MENU DI NAVIGAZIONE A SINISTRA */}
+            {/* MENU A SINISTRA */}
             <aside style={{ background: '#1e293b', padding: '20px', borderRadius: '10px', border: '1px solid #334155', height: 'fit-content' }}>
-              <h3 style={{ margin: '0 0 15px 0', color: '#f8fafc', fontSize: '18px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <h3 style={{ margin: '0 0 15px 0', color: '#f8fafc', fontSize: '18px' }}>
                 📌 Menu Navigazione
               </h3>
               <p style={{ color: '#94a3b8', fontSize: '13px', marginBottom: '15px' }}>Seleziona Sezione:</p>
@@ -295,7 +297,7 @@ export default function App() {
 
                     <label style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer', color: activeTab === 'admin_results' ? '#f59e0b' : '#f8fafc', fontWeight: activeTab === 'admin_results' ? 'bold' : 'normal' }}>
                       <input type="radio" name="navigation" checked={activeTab === 'admin_results'} onChange={() => setActiveTab('admin_results')} />
-                      📊 Monitoraggio Voti & Foto
+                      📊 Monitoraggio Voti & Podio
                     </label>
                   </>
                 )}
@@ -310,7 +312,7 @@ export default function App() {
                 <p style={{ margin: '2px 0', fontSize: '13px' }}>🗳️ <strong>Votazioni fino a:</strong> {settings ? new Date(settings.vote_deadline).toLocaleString() : '...'}</p>
               </div>
 
-              {/* SEZIONE 1: UPLOAD FOTO */}
+              {/* UPLOAD FOTO */}
               {activeTab === 'upload' && (
                 <div>
                   <h2 style={{ marginTop: 0, color: '#38bdf8' }}>📸 Carica la Foto del tuo Team</h2>
@@ -340,7 +342,7 @@ export default function App() {
                 </div>
               )}
 
-              {/* SEZIONE 2: GALLERIA E VOTAZIONE */}
+              {/* GALLERIA VOTI */}
               {activeTab === 'vote' && (
                 <div>
                   <h2 style={{ marginTop: 0, color: '#38bdf8' }}>🗳️ Galleria Foto Team</h2>
@@ -366,31 +368,11 @@ export default function App() {
                                 cursor: 'pointer',
                                 background: isVoted ? '#ef4444' : '#0284c7',
                                 color: '#fff',
-                                fontWeight: 'bold',
-                                marginBottom: isAdmin ? '8px' : '0'
+                                fontWeight: 'bold'
                               }}
                             >
                               {isVoted ? 'Rimuovi Voto ✕' : 'Vota Foto ★'}
                             </button>
-
-                            {/* TASTO CANCELLA PER ADMIN */}
-                            {isAdmin && (
-                              <button
-                                onClick={() => handleDeletePhoto(photo.id, photo.team_name)}
-                                style={{
-                                  width: '100%',
-                                  padding: '6px',
-                                  border: '1px solid #ef4444',
-                                  borderRadius: '6px',
-                                  cursor: 'pointer',
-                                  background: 'transparent',
-                                  color: '#ef4444',
-                                  fontSize: '12px'
-                                }}
-                              >
-                                Elimina Foto 🗑️
-                              </button>
-                            )}
                           </div>
                         </div>
                       );
@@ -399,7 +381,7 @@ export default function App() {
                 </div>
               )}
 
-              {/* SEZIONE 3 (ADMIN): SCADENZE E WHITELIST */}
+              {/* ADMIN SETTINGS */}
               {activeTab === 'admin_settings' && isAdmin && (
                 <div>
                   <h2 style={{ marginTop: 0, color: '#f59e0b' }}>🛠️ Gestione Scadenze & Whitelist</h2>
@@ -435,15 +417,61 @@ export default function App() {
                 </div>
               )}
 
-              {/* SEZIONE 4 (ADMIN): RISULTATI E ELIMINAZIONE FOTO */}
+              {/* ADMIN RESULTS & PODIO */}
               {activeTab === 'admin_results' && isAdmin && (
                 <div>
-                  <h2 style={{ marginTop: 0, color: '#f59e0b' }}>📊 Monitoraggio Risultati & Foto</h2>
-                  <p style={{ color: '#94a3b8', fontSize: '13px' }}>Sezione riservata esclusivamente ai 4 amministratori per la gestione delle foto e il conteggio dei voti.</p>
+                  <h2 style={{ marginTop: 0, color: '#f59e0b' }}>📊 Monitoraggio Risultati & Podio</h2>
+                  <p style={{ color: '#94a3b8', fontSize: '13px' }}>Classifica in tempo reale visibile soltanto alle 4 utenze Admin.</p>
 
-                  <table style={{ width: '100%', borderCollapse: 'collapse', marginTop: '15px' }}>
+                  {/* PODIO NATALIZIO */}
+                  {sortedPhotos.length > 0 && (
+                    <div style={{ background: '#0f172a', padding: '25px 15px', borderRadius: '12px', margin: '20px 0', border: '1px solid #334155' }}>
+                      <h3 style={{ textAlign: 'center', margin: '0 0 20px 0', color: '#38bdf8' }}>🏆 PODIO CONTEST NATALIZIO 🏆</h3>
+                      
+                      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'flex-end', gap: '15px' }}>
+                        
+                        {/* 2° POSTO (ARGENTO) */}
+                        {secondPlace && (
+                          <div style={{ textAlign: 'center', width: '140px', background: '#1e293b', borderRadius: '8px 8px 0 0', border: '2px solid #cbd5e1', padding: '10px', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                            <span style={{ fontSize: '24px' }}>🥈</span>
+                            <img src={secondPlace.photo_url} alt={secondPlace.team_name} style={{ width: '100%', height: '80px', objectFit: 'cover', borderRadius: '4px', margin: '5px 0' }} />
+                            <strong style={{ fontSize: '13px', color: '#cbd5e1', textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap', maxWidth: '120px' }}>{secondPlace.team_name}</strong>
+                            <span style={{ fontSize: '12px', color: '#38bdf8', fontWeight: 'bold' }}>{secondPlace.votesCount} voti</span>
+                            <div style={{ width: '100%', height: '50px', background: '#475569', marginTop: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold', color: '#fff' }}>2°</div>
+                          </div>
+                        )}
+
+                        {/* 1° POSTO (ORO) */}
+                        {firstPlace && (
+                          <div style={{ textAlign: 'center', width: '160px', background: '#1e293b', borderRadius: '8px 8px 0 0', border: '2px solid #f59e0b', padding: '10px', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                            <span style={{ fontSize: '32px' }}>🥇</span>
+                            <img src={firstPlace.photo_url} alt={firstPlace.team_name} style={{ width: '100%', height: '100px', objectFit: 'cover', borderRadius: '4px', margin: '5px 0' }} />
+                            <strong style={{ fontSize: '14px', color: '#f59e0b', textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap', maxWidth: '140px' }}>{firstPlace.team_name}</strong>
+                            <span style={{ fontSize: '13px', color: '#38bdf8', fontWeight: 'bold' }}>{firstPlace.votesCount} voti</span>
+                            <div style={{ width: '100%', height: '80px', background: '#b45309', marginTop: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '20px', fontWeight: 'bold', color: '#fff' }}>1°</div>
+                          </div>
+                        )}
+
+                        {/* 3° POSTO (BRONZO) */}
+                        {thirdPlace && (
+                          <div style={{ textAlign: 'center', width: '140px', background: '#1e293b', borderRadius: '8px 8px 0 0', border: '2px solid #b45309', padding: '10px', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                            <span style={{ fontSize: '24px' }}>🥉</span>
+                            <img src={thirdPlace.photo_url} alt={thirdPlace.team_name} style={{ width: '100%', height: '70px', objectFit: 'cover', borderRadius: '4px', margin: '5px 0' }} />
+                            <strong style={{ fontSize: '13px', color: '#d97706', textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap', maxWidth: '120px' }}>{thirdPlace.team_name}</strong>
+                            <span style={{ fontSize: '12px', color: '#38bdf8', fontWeight: 'bold' }}>{thirdPlace.votesCount} voti</span>
+                            <div style={{ width: '100%', height: '35px', background: '#78350f', marginTop: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold', color: '#fff' }}>3°</div>
+                          </div>
+                        )}
+
+                      </div>
+                    </div>
+                  )}
+
+                  {/* TABELLA GENERALE DETTAGLIATA */}
+                  <table style={{ width: '100%', borderCollapse: 'collapse', marginTop: '20px' }}>
                     <thead>
                       <tr style={{ background: '#0f172a', textAlign: 'left', borderBottom: '2px solid #334155' }}>
+                        <th style={{ padding: '10px' }}>Pos.</th>
                         <th style={{ padding: '10px' }}>Team</th>
                         <th style={{ padding: '10px' }}>Caricata da</th>
                         <th style={{ padding: '10px' }}>Totale Voti</th>
@@ -451,26 +479,24 @@ export default function App() {
                       </tr>
                     </thead>
                     <tbody>
-                      {photos
-                        .map(p => ({ ...p, votesCount: getPhotoVotesCount(p.id) }))
-                        .sort((a, b) => b.votesCount - a.votesCount)
-                        .map((photo, idx) => (
-                          <tr key={photo.id} style={{ borderBottom: '1px solid #334155' }}>
-                            <td style={{ padding: '10px', fontWeight: 'bold' }}>
-                              {idx === 0 ? '🥇 ' : idx === 1 ? '🥈 ' : idx === 2 ? '🥉 ' : ''}{photo.team_name}
-                            </td>
-                            <td style={{ padding: '10px', color: '#94a3b8', fontSize: '13px' }}>{photo.uploaded_by}</td>
-                            <td style={{ padding: '10px', color: '#38bdf8', fontWeight: 'bold', fontSize: '16px' }}>{photo.votesCount}</td>
-                            <td style={{ padding: '10px', textAlign: 'center' }}>
-                              <button
-                                onClick={() => handleDeletePhoto(photo.id, photo.team_name)}
-                                style={{ background: '#ef4444', color: '#fff', border: 'none', padding: '6px 12px', borderRadius: '4px', cursor: 'pointer', fontSize: '12px', fontWeight: 'bold' }}
-                              >
-                                Elimina 🗑️
-                              </button>
-                            </td>
-                          </tr>
-                        ))}
+                      {sortedPhotos.map((photo, idx) => (
+                        <tr key={photo.id} style={{ borderBottom: '1px solid #334155' }}>
+                          <td style={{ padding: '10px', fontWeight: 'bold', color: idx === 0 ? '#f59e0b' : idx === 1 ? '#cbd5e1' : idx === 2 ? '#d97706' : '#fff' }}>
+                            #{idx + 1}
+                          </td>
+                          <td style={{ padding: '10px', fontWeight: 'bold' }}>{photo.team_name}</td>
+                          <td style={{ padding: '10px', color: '#94a3b8', fontSize: '13px' }}>{photo.uploaded_by}</td>
+                          <td style={{ padding: '10px', color: '#38bdf8', fontWeight: 'bold', fontSize: '16px' }}>{photo.votesCount}</td>
+                          <td style={{ padding: '10px', textAlign: 'center' }}>
+                            <button
+                              onClick={() => handleDeletePhoto(photo.id, photo.team_name)}
+                              style={{ background: '#ef4444', color: '#fff', border: 'none', padding: '6px 12px', borderRadius: '4px', cursor: 'pointer', fontSize: '12px', fontWeight: 'bold' }}
+                            >
+                              Elimina 🗑️
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
                     </tbody>
                   </table>
                 </div>
